@@ -1,16 +1,51 @@
 from __future__ import annotations
 
 import json
+import logging
+import re
+
 from openai import AsyncOpenAI
 from app.config import OPENAI_API_KEY, LLM_MODEL
 from app.prompts.filter_extraction import FILTER_EXTRACTION_PROMPT
 from app.prompts.response_generation import RESPONSE_GENERATION_PROMPT
 
+logger = logging.getLogger(__name__)
 
-def get_client():
+# Singleton client — reuses HTTP connection pool across requests
+_client: AsyncOpenAI | None = None
+
+
+def get_client() -> AsyncOpenAI | None:
+    global _client
     if not OPENAI_API_KEY:
         return None
-    return AsyncOpenAI(api_key=OPENAI_API_KEY)
+    if _client is None:
+        _client = AsyncOpenAI(api_key=OPENAI_API_KEY)
+    return _client
+
+
+VALID_SERVICE_TYPES = {"evaluator", "tutor", "advocate", "therapist", "school_psychologist", "clinic", "support_group", "nonprofit_org"}
+VALID_SPECIALIZATIONS = {"dyslexia", "adhd", "dyscalculia", "dysgraphia", "general_ld", "adult_ld", "iep_504", "workplace_accommodations"}
+VALID_COST_TIERS = {"free", "sliding_scale", "low_cost", "standard"}
+VALID_AGE_GROUPS = {"children", "adolescents", "adults"}
+
+
+def _validate_filters(raw: dict) -> dict:
+    """Validate and coerce LLM-extracted filters to expected types."""
+    return {
+        "service_types": [s for s in raw.get("service_types", []) or [] if s in VALID_SERVICE_TYPES],
+        "specializations": [s for s in raw.get("specializations", []) or [] if s in VALID_SPECIALIZATIONS],
+        "cost_tier": [s for s in raw.get("cost_tier", []) or [] if s in VALID_COST_TIERS],
+        "location": {
+            "city": raw.get("location", {}).get("city") if isinstance(raw.get("location"), dict) else None,
+            "zip": raw.get("location", {}).get("zip") if isinstance(raw.get("location"), dict) else None,
+        },
+        "age_group": [s for s in raw.get("age_group", []) or [] if s in VALID_AGE_GROUPS],
+        "needs_providers": bool(raw.get("needs_providers", False)),
+        "needs_more_info": bool(raw.get("needs_more_info", False)),
+        "escalate": bool(raw.get("escalate", False)),
+        "search_text": str(raw.get("search_text", ""))[:200],
+    }
 
 
 async def extract_filters(conversation_history: list[dict]) -> dict:
@@ -31,9 +66,10 @@ async def extract_filters(conversation_history: list[dict]) -> dict:
             text={"format": {"type": "json_object"}},
         )
         text = response.output_text.strip()
-        return json.loads(text)
-    except Exception as e:
-        print(e)
+        raw = json.loads(text)
+        return _validate_filters(raw)
+    except Exception:
+        logger.exception("Filter extraction failed")
         return _fallback_filter_extraction(conversation_history)
 
 
@@ -44,8 +80,8 @@ async def generate_response(
     if not client:
         return _fallback_response(conversation_history, provider_context)
 
-    system_prompt = RESPONSE_GENERATION_PROMPT.replace(
-        "{provider_context}", provider_context
+    system_prompt = RESPONSE_GENERATION_PROMPT.format(
+        provider_context=provider_context
     )
 
     input_messages = [
@@ -61,6 +97,7 @@ async def generate_response(
         )
         return response.output_text
     except Exception:
+        logger.exception("Response generation failed")
         return _fallback_response(conversation_history, provider_context)
 
 
@@ -76,6 +113,7 @@ def _fallback_filter_extraction(conversation_history: list[dict]) -> dict:
         "location": {"city": None, "zip": None},
         "age_group": [],
         "needs_providers": False,
+        "needs_more_info": False,
         "escalate": False,
         "search_text": "",
     }
@@ -125,7 +163,6 @@ def _fallback_filter_extraction(conversation_history: list[dict]) -> dict:
             break
 
     # Zip code
-    import re
     zip_match = re.search(r"\b(\d{5})\b", all_text)
     if zip_match:
         filters["location"]["zip"] = zip_match.group(1)
@@ -142,6 +179,16 @@ def _fallback_filter_extraction(conversation_history: list[dict]) -> dict:
 
     filters["search_text"] = last_message[:100]
 
+    # If we couldn't extract any meaningful filters, ask for more info
+    has_useful_filters = (
+        filters["service_types"]
+        or filters["specializations"]
+        or filters["age_group"]
+        or filters["location"]["city"]
+        or filters["location"]["zip"]
+    )
+    filters["needs_more_info"] = filters["needs_providers"] and not has_useful_filters
+
     return filters
 
 
@@ -149,7 +196,13 @@ def _fallback_response(conversation_history: list[dict], provider_context: str) 
     """Basic response when no LLM is available."""
     is_first = len(conversation_history) <= 1
 
-    if provider_context and provider_context.strip():
+    if provider_context == "_ESCALATE_":
+        response = (
+            "I can see you're going through a really difficult time, and I want to make sure you get the right support. "
+            "Please reach out to LDAPA directly at their main office, or if this is an emergency, please call 911 or the "
+            "988 Suicide & Crisis Lifeline (call or text 988). You're not alone, and help is available."
+        )
+    elif provider_context and provider_context.strip() and provider_context != "No matching providers found in the directory.":
         response = "Thank you for reaching out! Based on what you've told me, here are some resources that might help.\n\n[PROVIDERS]\n\nWould you like to know more about any of these providers, or is there something else I can help you with?"
     else:
         response = "Thank you for reaching out to LDAPA! I'd love to help you find the right support. Could you tell me a bit more about what you're looking for? For example:\n\n- Are you looking for an evaluation, tutoring, therapy, or advocacy help?\n- What area of Pennsylvania are you in?\n- Is this for a child, teen, or adult?\n\nThe more details you share, the better I can help match you with the right resources."

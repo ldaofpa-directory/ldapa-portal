@@ -1,16 +1,17 @@
 from __future__ import annotations
 
-from pydantic import BaseModel
+from typing import Literal
+from pydantic import BaseModel, Field
 
 
 class ChatMessage(BaseModel):
-    role: str
-    content: str
+    role: Literal["user", "assistant"]
+    content: str = Field(max_length=10000)
 
 
 class ChatRequest(BaseModel):
     session_id: str | None = None
-    message: str
+    message: str = Field(min_length=1, max_length=5000)
     history: list[ChatMessage] = []
 
 
@@ -43,4 +44,4 @@ class ChatResponse(BaseModel):
 class FeedbackRequest(BaseModel):
     message_id: str
     session_id: str
-    rating: str
+    rating: Literal["positive", "negative"]

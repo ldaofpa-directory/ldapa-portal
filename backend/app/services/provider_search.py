@@ -4,8 +4,15 @@ import json
 from app.database import get_db
 
 
-async def search_providers(filters: dict) -> list[dict]:
-    db = await get_db()
+def _escape_like(value: str) -> str:
+    """Escape special LIKE pattern characters."""
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+async def search_providers(filters: dict, db=None) -> list[dict]:
+    close_db = db is None
+    if db is None:
+        db = await get_db()
     try:
         conditions = ["p.is_deleted = 0", "p.verification_status = 'verified'"]
         params = []
@@ -57,13 +64,13 @@ async def search_providers(filters: dict) -> list[dict]:
         if search_text:
             order_clause = """
                 CASE
-                    WHEN LOWER(p.name) LIKE LOWER(?) THEN 1
-                    WHEN LOWER(p.description) LIKE LOWER(?) THEN 2
-                    WHEN LOWER(p.organization) LIKE LOWER(?) THEN 3
+                    WHEN LOWER(p.name) LIKE LOWER(?) ESCAPE '\\' THEN 1
+                    WHEN LOWER(p.description) LIKE LOWER(?) ESCAPE '\\' THEN 2
+                    WHEN LOWER(p.organization) LIKE LOWER(?) ESCAPE '\\' THEN 3
                     ELSE 4
                 END, p.name ASC
             """
-            search_param = f"%{search_text}%"
+            search_param = f"%{_escape_like(search_text)}%"
             params.extend([search_param, search_param, search_param])
 
         query = f"""
@@ -82,7 +89,8 @@ async def search_providers(filters: dict) -> list[dict]:
 
         return providers
     finally:
-        await db.close()
+        if close_db:
+            await db.close()
 
 
 async def get_all_providers(

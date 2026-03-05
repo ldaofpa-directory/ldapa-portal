@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import time
 import uuid
-from fastapi import APIRouter
+from collections import defaultdict
+from fastapi import APIRouter, HTTPException
 from app.database import get_db
 from app.models.chat import ChatRequest, ChatResponse, FeedbackRequest, ProviderCard
 from app.services.llm import extract_filters, generate_response
@@ -10,9 +12,26 @@ from app.services.provider_search import search_providers, format_provider_conte
 
 router = APIRouter(prefix="/api", tags=["chat"])
 
+# Simple in-memory rate limiter: {ip_or_session: [timestamps]}
+_rate_limits: dict[str, list[float]] = defaultdict(list)
+RATE_LIMIT_MAX = 30  # max requests
+RATE_LIMIT_WINDOW = 60  # per 60 seconds
+
+
+def _check_rate_limit(key: str) -> None:
+    now = time.monotonic()
+    timestamps = _rate_limits[key]
+    # Remove expired entries
+    _rate_limits[key] = [t for t in timestamps if now - t < RATE_LIMIT_WINDOW]
+    if len(_rate_limits[key]) >= RATE_LIMIT_MAX:
+        raise HTTPException(status_code=429, detail="Too many requests. Please try again later.")
+    _rate_limits[key].append(now)
+
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
+    _check_rate_limit(request.session_id or "anon")
+
     db = await get_db()
     try:
         # Create or retrieve session
@@ -31,8 +50,9 @@ async def chat(request: ChatRequest):
         # Call 1: Extract filters
         filters = await extract_filters(history)
 
-        # Check for escalation
+        # Check for escalation or insufficient info
         escalate = filters.get("escalate", False)
+        needs_more_info = filters.get("needs_more_info", False)
         providers_data = []
         provider_cards = []
 
@@ -41,9 +61,12 @@ async def chat(request: ChatRequest):
             await db.execute(
                 "UPDATE chat_sessions SET escalated = 1 WHERE id = ?", (session_id,)
             )
+        elif needs_more_info:
+            # Skip provider search — LLM will ask follow-up questions
+            pass
         elif filters.get("needs_providers", False):
-            # Query database for matching providers
-            providers_data = await search_providers(filters)
+            # Query database for matching providers (reuse existing db connection)
+            providers_data = await search_providers(filters, db=db)
             provider_cards = [
                 ProviderCard(
                     id=p["id"],
@@ -67,7 +90,14 @@ async def chat(request: ChatRequest):
             ]
 
         # Call 2: Generate response
-        provider_context = format_provider_context(providers_data)
+        if escalate:
+            provider_context = "_ESCALATE_"
+        elif needs_more_info:
+            provider_context = "Need more information from the user before searching. Ask follow-up questions."
+        elif not filters.get("needs_providers", False):
+            provider_context = "No provider search needed. The user is asking a general question — answer it directly."
+        else:
+            provider_context = format_provider_context(providers_data)
         response_text = await generate_response(history, provider_context)
 
         # Update location if extracted
