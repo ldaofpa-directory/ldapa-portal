@@ -245,10 +245,24 @@ function ChatPageInner() {
       const response = await sendChatMessage(text, history, sessionId || undefined);
       setSessionId(response.session_id);
 
+      // Strip [PROVIDERS] marker and any LLM-generated provider listing from the text
+      // since the frontend renders provider cards separately
+      let cleanedContent = response.response;
+      if (response.providers && response.providers.length > 0) {
+        // Remove [PROVIDERS] marker and everything after it that looks like a provider listing
+        // (lines starting with "- " or numbered items after [PROVIDERS])
+        cleanedContent = cleanedContent
+          .replace(/\[PROVIDERS\]\s*/gi, "")
+          .replace(/\n(- .+(\n  .+)*\n?)+$/g, "") // trailing "- Provider Name\n  detail\n  detail" blocks
+          .replace(/\n(- .+(\n  .+)*\n?)+(\n|$)/g, "\n") // mid-text provider blocks
+          .replace(/\n{3,}/g, "\n\n") // collapse extra newlines
+          .trim();
+      }
+
       const assistantMsg: DisplayMessage = {
         id: `assistant-${Date.now()}`,
         role: "assistant",
-        content: response.response,
+        content: cleanedContent,
         providers: response.providers,
         escalate: response.escalate,
         feedback: null,
