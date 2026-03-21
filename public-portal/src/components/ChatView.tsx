@@ -19,6 +19,7 @@ interface DisplayMessage {
   escalate?: boolean;
   feedback?: "up" | "down" | null;
   noMatch?: boolean;
+  followUps?: string[];
 }
 
 interface ProviderModalType {
@@ -34,10 +35,60 @@ interface ProviderModalType {
   verifiedDate: string;
 }
 
+const ROLE_LABEL: Record<string, string> = {
+  myself: "yourself",
+  child: "your child",
+  other: "someone else",
+};
+
+const FOLLOW_UPS: Record<string, string[]> = {
+  tutor: [
+    "What's the typical cost for a tutor?",
+    "Are there online tutoring options?",
+    "How do I know if a tutor is right for us?",
+  ],
+  evaluation: [
+    "How long does an evaluation take?",
+    "Does insurance cover evaluations?",
+    "What happens after the evaluation?",
+  ],
+  iep: [
+    "What's the difference between an IEP and a 504 Plan?",
+    "Can I request an IEP meeting anytime?",
+    "What rights do I have in the IEP process?",
+  ],
+  reading: [
+    "What is the Orton-Gillingham method?",
+    "How early should I get help for reading issues?",
+    "Are there apps that can help with reading?",
+  ],
+  workplace: [
+    "How do I request accommodations at work?",
+    "Does my employer have to keep this confidential?",
+    "What accommodations are most common for LD?",
+  ],
+  default: [
+    "Can you help me find a local provider?",
+    "What services does LDA of PA offer?",
+    "How do I get started?",
+  ],
+};
+
+function getFollowUps(message: string): string[] {
+  const lower = message.toLowerCase();
+  if (lower.includes("tutor")) return FOLLOW_UPS.tutor;
+  if (lower.includes("eval") || lower.includes("assess")) return FOLLOW_UPS.evaluation;
+  if (lower.includes("iep") || lower.includes("504")) return FOLLOW_UPS.iep;
+  if (lower.includes("read") || lower.includes("dyslexia")) return FOLLOW_UPS.reading;
+  if (lower.includes("work") || lower.includes("job") || lower.includes("college")) return FOLLOW_UPS.workplace;
+  return FOLLOW_UPS.default;
+}
+
 export function ChatView() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const userType = searchParams.get("userType") || "other";
+  const roleLabel = ROLE_LABEL[userType] || "someone";
 
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
@@ -84,19 +135,48 @@ export function ChatView() {
         providers: response.providers,
         escalate: response.escalate,
         feedback: null,
+        followUps: getFollowUps(text),
       };
       setMessages((prev) => [...prev, assistantMsg]);
     } catch {
       setMessages((prev) => [...prev, {
         id: `error-${Date.now()}`,
         role: "assistant",
-        content: "I'm sorry, I'm having trouble connecting right now. Please try again or contact LDAPA directly at info@ldapa.org.",
+        content: "I'm sorry, I'm having trouble connecting right now. Please try again or contact LDA of PA directly at info@ldapa.org.",
         feedback: null,
+        followUps: FOLLOW_UPS.default,
       }]);
     } finally {
       setIsLoading(false);
     }
   }, [inputValue, isLoading, messages, sessionId]);
+
+  // Leading question builder for quick action buttons
+  const buildLeadingMessage = (actionLabel: string): string => {
+    const lower = actionLabel.toLowerCase();
+    const role = roleLabel;
+
+    if (lower.includes("tutor")) {
+      return `I'm looking for a tutor for ${role}. Before you suggest options, could you ask me a few questions to help find the right match? For example, location, age, subject area, and budget.`;
+    }
+    if (lower.includes("evaluation")) {
+      return `I'd like to get an evaluation for ${role}. Could you ask me some questions first to understand the situation better — like age, specific concerns, and location?`;
+    }
+    if (lower.includes("iep") || lower.includes("504")) {
+      return `I need help with an IEP or 504 Plan for ${role}. Could you ask me a few questions to understand where we are in the process and what kind of help we need?`;
+    }
+    if (lower.includes("reading") || lower.includes("dyslexia")) {
+      return `I'm looking for reading support for ${role}. Before suggesting resources, could you ask me about the specific challenges, age, and location?`;
+    }
+    if (lower.includes("workplace") || lower.includes("college") || lower.includes("accommodation")) {
+      return `I need help with workplace or college accommodations for ${role}. Could you ask me a few questions first — like the type of environment, specific challenges, and what accommodations have been tried?`;
+    }
+    if (lower.includes("provider")) {
+      return `I'm looking for a service provider for ${role}. Could you ask me a few questions to narrow it down — like location, type of service needed, age, and budget?`;
+    }
+    // fallback
+    return `I'm looking for help for ${role} regarding: ${actionLabel}. Could you ask me a few questions to better understand the situation before suggesting resources?`;
+  };
 
   const handleFeedback = async (messageId: string, rating: "up" | "down") => {
     setMessages((prev) =>
@@ -147,7 +227,10 @@ export function ChatView() {
             <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
               <span className="text-white text-lg font-bold">L</span>
             </div>
-            <h1 className="text-xl font-bold text-gray-900">Resource Assistant</h1>
+            <div>
+              <h1 className="text-xl font-bold text-gray-900">LDA of PA</h1>
+              <p className="text-xs text-gray-400 leading-none">Resource Assistant</p>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <button
@@ -182,7 +265,7 @@ export function ChatView() {
             <div className="flex items-start gap-2">
               <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
               <p className="text-base text-blue-900">
-                <span className="font-semibold">Notice:</span> Responses are based on verified directory data. For urgent needs, please contact a specialist.
+                <span className="font-semibold">Notice:</span> Responses are based on verified LDA of PA directory data. For urgent needs, please contact a specialist.
               </p>
             </div>
           </div>
@@ -196,7 +279,7 @@ export function ChatView() {
                     <span className="text-3xl">💬</span>
                   </div>
                   <h2 className="text-xl font-semibold text-gray-900 mb-2">
-                    Welcome to LDAPA Chat
+                    Welcome to LDA of PA Chat
                   </h2>
                   <p className="text-gray-500 max-w-md mx-auto">
                     Ask me anything about learning disabilities, evaluations, IEPs, or finding support providers.
@@ -224,7 +307,7 @@ export function ChatView() {
                             <div className="flex items-start gap-3">
                               <span className="text-2xl">⚠️</span>
                               <div>
-                                <h4 className="font-semibold text-amber-900">Contact LDAPA Directly</h4>
+                                <h4 className="font-semibold text-amber-900">Contact LDA of PA Directly</h4>
                                 <p className="mt-1 text-sm text-amber-800">This is best handled by a person.</p>
                                 <div className="mt-3 space-y-1 text-sm">
                                   <p><span className="font-medium">Phone:</span> (484) 487-0300</p>
@@ -245,9 +328,7 @@ export function ChatView() {
                               {message.providers.map((provider) => (
                                 <div key={provider.id} className="bg-blue-50 border-2 border-blue-200 rounded-xl p-5">
                                   <div className="flex items-start justify-between gap-4 mb-2">
-                                    <div>
-                                      <h4 className="text-lg font-bold text-gray-900">{provider.name}</h4>
-                                    </div>
+                                    <h4 className="text-lg font-bold text-gray-900">{provider.name}</h4>
                                     <div className="flex items-center gap-1 bg-green-100 border border-green-400 rounded-full px-3 py-1 flex-shrink-0">
                                       <span className="text-sm font-semibold text-green-700">✓ Verified</span>
                                     </div>
@@ -293,6 +374,20 @@ export function ChatView() {
                             </button>
                           </div>
                         )}
+
+                        {/* Follow-up suggestion chips */}
+                        {message.followUps && message.followUps.length > 0 && (
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            {message.followUps.map((followUp, i) => (
+                              <button
+                                key={i}
+                                onClick={() => handleSendMessage(followUp)}
+                                className="text-sm bg-blue-50 border border-blue-200 text-blue-700 rounded-full px-4 py-1.5 hover:bg-blue-100 hover:border-blue-400 transition">
+                                💬 {followUp}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -323,7 +418,7 @@ export function ChatView() {
                 return (
                   <button
                     key={index}
-                    onClick={() => handleSendMessage(action.label)}
+                    onClick={() => handleSendMessage(buildLeadingMessage(action.label))}
                     className="rounded-full border-2 border-blue-300 bg-white hover:bg-blue-50 hover:border-blue-400 px-5 py-2 flex items-center gap-2 whitespace-nowrap font-medium text-gray-800 flex-shrink-0 transition">
                     <Icon className="w-4 h-4 text-blue-500" />
                     {action.label}
@@ -339,7 +434,7 @@ export function ChatView() {
               {["Find a Provider", "General Info", "Legal & Eval Info"].map((label) => (
                 <button
                   key={label}
-                  onClick={() => handleSendMessage(label)}
+                  onClick={() => handleSendMessage(buildLeadingMessage(label))}
                   className="rounded-full border-2 border-blue-400 bg-white hover:bg-blue-50 px-5 py-2 font-semibold text-blue-600 flex-shrink-0 transition">
                   {label}
                 </button>
@@ -380,10 +475,10 @@ export function ChatView() {
 
             <div className="mt-4 text-center">
               <button
-                onClick={() => handleSendMessage("I need to speak with a person at LDAPA")}
+                onClick={() => handleSendMessage("I need to speak with a person at LDA of PA")}
                 className="border-2 border-blue-400 text-blue-600 hover:bg-blue-50 rounded-lg px-6 py-2 font-semibold flex items-center gap-2 mx-auto transition">
                 <Phone className="w-4 h-4" />
-                Contact LDAPA
+                Contact LDA of PA
               </button>
             </div>
           </div>

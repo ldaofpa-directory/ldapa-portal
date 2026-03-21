@@ -42,7 +42,7 @@ export default function UserTypeSelection() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-gray-900">
-                LDAPA Resource Assistant
+                LDA of PA Resource Assistant
               </h1>
             </div>
           </div>
