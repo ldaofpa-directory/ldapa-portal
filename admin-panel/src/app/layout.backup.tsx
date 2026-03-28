@@ -1,22 +1,25 @@
 import type { Metadata } from "next";
-import { Geist } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
 
-const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
+const inter = Inter({
+  variable: "--font-inter",
+  subsets: ["latin"],
+});
 
 export const metadata: Metadata = {
   title: "LDAPA Admin Panel",
-  description: "Provider Directory Admin",
+  description: "Admin dashboard for managing the LDAPA provider directory",
 };
 
 export default function RootLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <html lang="en">
-      <body className={geist.variable}>
+      <body className={`${inter.variable} font-sans antialiased`}>
         {children}
       </body>
     </html>
