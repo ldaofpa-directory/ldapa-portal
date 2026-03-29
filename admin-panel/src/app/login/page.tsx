@@ -19,7 +19,7 @@ export default function LoginPage() {
     try {
       const data = await login(email, password);
       setAuth(data.token, data.user);
-      router.push("/dashboard");
+      router.push("/overview");
     } catch {
       setError("Invalid email or password");
     } finally {
