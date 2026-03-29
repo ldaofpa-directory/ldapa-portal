@@ -275,9 +275,9 @@ export function ChatView() {
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto px-6 py-6">
-            <div className="space-y-6 min-h-full flex flex-col justify-center">
+            <div className="space-y-6 max-w-3xl mx-auto w-full">
               {messages.length === 0 && !isLoading && (
-                <div className="flex flex-col items-center justify-center h-full text-center py-8">
+                <div className="flex flex-col items-center text-center py-16">
                   <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-100">
                     <span className="text-3xl">💬</span>
                   </div>
