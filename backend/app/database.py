@@ -177,9 +177,14 @@ def _adapt_schema_for_pg(schema: str) -> str:
 async def init_db():
     db = await get_db()
     try:
-        schema_path = os.path.join(os.path.dirname(__file__), "..", "..", "database", "schema.sql")
-        if not os.path.exists(schema_path):
-            schema_path = os.path.join(os.path.dirname(__file__), "..", "database", "schema.sql")
+        # Look for schema.sql in multiple locations (local dev vs deployed)
+        _base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        candidates = [
+            os.path.join(_base, "..", "database", "schema.sql"),  # repo root: database/schema.sql
+            os.path.join(_base, "schema.sql"),                     # backend/schema.sql (deployed)
+            os.path.join(_base, "database", "schema.sql"),         # backend/database/schema.sql
+        ]
+        schema_path = next((p for p in candidates if os.path.exists(p)), candidates[0])
         with open(schema_path) as f:
             schema = f.read()
 
@@ -240,12 +245,21 @@ async def _import_csv_seed(db: DB) -> bool:
     """Import providers from the LDAPA directory CSV export if available."""
     from app.services.csv_importer import parse_csv
 
-    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    csv_candidates = [
-        os.path.join(base_dir, f)
-        for f in os.listdir(base_dir)
-        if f.endswith(".csv") and "export_members" in f.lower()
+    # Look for CSV in repo root (local dev) and backend dir (deployed)
+    _base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    search_dirs = [
+        os.path.join(_base, ".."),  # repo root
+        _base,                       # backend/
     ]
+    csv_candidates = []
+    for d in search_dirs:
+        d = os.path.abspath(d)
+        if os.path.isdir(d):
+            csv_candidates.extend(
+                os.path.join(d, f)
+                for f in os.listdir(d)
+                if f.endswith(".csv") and "export_members" in f.lower()
+            )
 
     if not csv_candidates:
         return False
