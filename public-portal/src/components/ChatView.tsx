@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Send, RotateCcw, Phone, BookOpen, GraduationCap,
-  Users, FileText, Briefcase, ArrowLeft, MapPin, Info,
+  Users, FileText, Briefcase, ArrowLeft, MapPin, Info, Mail,
 } from "lucide-react";
 import { sendChatMessage, submitFeedback, type ChatMessage, type ProviderCard } from "@/lib/api";
 import { ProviderModal } from "./ProviderModal";
@@ -84,6 +84,70 @@ function getFollowUps(message: string): string[] {
   return FOLLOW_UPS.default;
 }
 
+// Role-specific quick actions with proper backend-ready messages
+const QUICK_ACTIONS: Record<string, { label: string; icon: any; message: string }[]> = {
+  myself: [
+    { label: "Reading & Dyslexia", icon: BookOpen, message: "I'm an adult with reading difficulties or dyslexia and I'm looking for support for myself. Can you ask me a few questions to help find the right resources?" },
+    { label: "Find a Tutor", icon: GraduationCap, message: "I'm looking for a specialized tutor for myself. Can you ask me about my subject needs, location, and budget to find the best match?" },
+    { label: "Get Evaluated", icon: Users, message: "I'd like to get a learning disability evaluation for myself. Can you ask me a few questions about my situation and location to help me find the right evaluator?" },
+    { label: "Workplace Support", icon: Briefcase, message: "I need help understanding my rights and getting accommodations for a learning disability in my workplace. Can you guide me through the process?" },
+    { label: "College Accommodations", icon: FileText, message: "I'm a college student with a learning disability and need help getting academic accommodations. What do I need to know and do?" },
+  ],
+  child: [
+    { label: "IEP or 504 Plan", icon: FileText, message: "I'm a parent and I need help understanding and navigating the IEP or 504 Plan process for my child. Can you ask me some questions about my child's situation and school?" },
+    { label: "Find a Tutor", icon: GraduationCap, message: "I'm looking for a specialized tutor for my child with a learning disability. Can you ask me about their age, subject needs, location, and our budget?" },
+    { label: "Get My Child Evaluated", icon: Users, message: "I'd like to get my child evaluated for a learning disability. Can you ask me about their age, current challenges, and location to help find the right evaluator?" },
+    { label: "Reading Help", icon: BookOpen, message: "My child is struggling with reading and may have dyslexia. Can you ask me about their age and situation and suggest the best resources?" },
+    { label: "School Accommodations", icon: Briefcase, message: "I need help getting school accommodations for my child with a learning disability. What are my rights and how do I start the process?" },
+  ],
+  other: [
+    { label: "Find a Provider", icon: Users, message: "I'm helping someone with a learning disability find support services. Can you ask me a few questions about their needs, age, and location to suggest the right providers?" },
+    { label: "IEP or 504 Help", icon: FileText, message: "I'm helping navigate the IEP or 504 Plan process for someone I support. Can you walk me through the key steps and ask about their situation?" },
+    { label: "Evaluation Resources", icon: GraduationCap, message: "I'm helping someone get evaluated for a learning disability. Can you ask me about their age and location to find the right evaluator?" },
+    { label: "Reading Support", icon: BookOpen, message: "I'm helping someone who struggles with reading and may have dyslexia. Can you ask me about their situation and suggest appropriate support?" },
+    { label: "Workplace Rights", icon: Briefcase, message: "I'm helping someone understand their rights and get accommodations for a learning disability at work. What should they know?" },
+  ],
+};
+
+// Draft email modal
+function ContactModal({ userType, onClose }: { userType: string; onClose: () => void }) {
+  const roleContext = ROLE_LABEL[userType] || "someone";
+  const subject = encodeURIComponent("Inquiry about LDA of PA Support Services");
+  const body = encodeURIComponent(
+    `Dear LDA of PA Team,\n\nI hope this message finds you well. I am reaching out to inquire about support services and resources available through LDA of PA.\n\nI am seeking help for ${roleContext} regarding learning disability support. I would appreciate guidance on the following:\n\n- Available services and how to access them\n- Next steps for getting an evaluation or finding a provider\n- Any upcoming events or programs that may be relevant\n\nPlease feel free to reach out at your earliest convenience. Thank you for the incredible work you do supporting individuals and families affected by learning disabilities.\n\nBest regards,\n[Your Name]\n[Your Phone Number]`
+  );
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full p-6">
+        <h2 className="text-xl font-bold text-gray-900 mb-2">Contact LDA of PA</h2>
+        <p className="text-gray-600 text-sm mb-4">
+          A draft email has been prepared for you. Click the button below to open it in your email app, or copy the details to send manually.
+        </p>
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4 text-sm text-gray-700 space-y-2">
+          <p><span className="font-semibold">To:</span> info@ldapa.org</p>
+          <p><span className="font-semibold">Subject:</span> Inquiry about LDA of PA Support Services</p>
+          <p><span className="font-semibold">Phone:</span> (484) 487-0300</p>
+          <p><span className="font-semibold">Hours:</span> Mon–Fri, 9am–5pm ET</p>
+        </div>
+        <div className="flex gap-3">
+          <a
+            href={`mailto:info@ldapa.org?subject=${subject}&body=${body}`}
+            className="flex-1 bg-blue-500 hover:bg-blue-600 text-white rounded-xl py-3 font-semibold text-center flex items-center justify-center gap-2 transition">
+            <Mail className="w-4 h-4" />
+            Open in Email App
+          </a>
+          <button
+            onClick={onClose}
+            className="flex-1 border-2 border-gray-300 hover:bg-gray-50 text-gray-700 rounded-xl py-3 font-semibold transition">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function ChatView() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -97,6 +161,7 @@ export function ChatView() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [selectedProvider, setSelectedProvider] = useState<ProviderModalType | null>(null);
   const [recentTopics, setRecentTopics] = useState<string[]>([]);
+  const [showContactModal, setShowContactModal] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -106,10 +171,13 @@ export function ChatView() {
   const handleSendMessage = useCallback(async (text: string) => {
     if (!text.trim() || isLoading) return;
 
+    // Prepend role context
+    const contextualText = `[User is seeking help for: ${roleLabel}] ${text}`;
+
     const userMsg: DisplayMessage = {
       id: `user-${Date.now()}`,
       role: "user",
-      content: text,
+      content: text, // show clean text to user
     };
     setMessages((prev) => [...prev, userMsg]);
     setInputValue("");
@@ -125,10 +193,8 @@ export function ChatView() {
         content: m.content,
       }));
 
-      let messageText = text;
-      if (userType) messageText = `[User is seeking help for: ${roleLabel}] ${messageText}`;
-      if (locationInput.trim()) messageText = `${messageText} [Location: ${locationInput.trim()}]`;
-      const response = await sendChatMessage(messageText, history, sessionId || undefined);
+      // Send contextual text to backend, show clean text in UI
+      const response = await sendChatMessage(contextualText, history, sessionId || undefined);
       setSessionId(response.session_id);
 
       const assistantMsg: DisplayMessage = {
@@ -145,92 +211,34 @@ export function ChatView() {
       setMessages((prev) => [...prev, {
         id: `error-${Date.now()}`,
         role: "assistant",
-        content: "I'm sorry, I'm having trouble connecting right now. Please try again or contact LDA of PA directly at info@ldaofpa.org.",
+        content: "I'm sorry, I'm having trouble connecting right now. Please try again or contact LDA of PA directly at info@ldapa.org.",
         feedback: null,
         followUps: FOLLOW_UPS.default,
       }]);
     } finally {
       setIsLoading(false);
     }
-  }, [inputValue, isLoading, messages, sessionId]);
-
-  // Leading questions builder for quick action buttons
-  const buildLeadingMessage = (actionLabel: string): string => {
-    const lower = actionLabel.toLowerCase();
-
-    if (userType === "myself") {
-      if (lower.includes("tutor")) return `I'm looking for a tutor for myself.`;
-      if (lower.includes("reading")) return `I need help with reading for myself.`;
-      if (lower.includes("evaluation")) return `I'd like to get an evaluation for myself.`;
-      if (lower.includes("workplace") || lower.includes("college")) return `I need help with accommodations for myself.`;
-      if (lower.includes("provider")) return `I'm looking for a service provider for myself.`;
-    }
-
-    if (userType === "child") {
-      if (lower.includes("tutor")) return `I'm a parent looking for a tutor for my child.`;
-      if (lower.includes("reading")) return `I need help with reading for my child.`;
-      if (lower.includes("evaluation")) return `I'd like to get an evaluation for my child.`;
-      if (lower.includes("iep") || lower.includes("504")) return `I need help with an IEP or 504 Plan for my child.`;
-      if (lower.includes("provider")) return `I'm looking for a service provider for my child.`;
-    }
-
-    if (userType === "other") {
-      if (lower.includes("tutor")) return `I'm looking for a tutor for someone I support.`;
-      if (lower.includes("reading")) return `I need reading support for someone I'm helping.`;
-      if (lower.includes("evaluation")) return `I'd like to get an evaluation for someone I support.`;
-      if (lower.includes("provider")) return `I'm looking for a service provider for someone I support.`;
-    }
-
-    return actionLabel;
-  };
+  }, [inputValue, isLoading, messages, sessionId, roleLabel]);
 
   const handleFeedback = async (messageId: string, rating: "up" | "down") => {
     setMessages((prev) =>
       prev.map((m) => (m.id === messageId ? { ...m, feedback: rating } : m))
     );
     if (sessionId) {
-      try {
-        await submitFeedback(messageId, sessionId, rating);
-      } catch {}
+      try { await submitFeedback(messageId, sessionId, rating); } catch {}
     }
   };
 
-  const getQuickActions = () => {
-    if (userType === "myself") {
-      return [
-        { label: "Help with reading", icon: BookOpen },
-        { label: "Find a tutor", icon: GraduationCap },
-        { label: "Get an evaluation", icon: Users },
-        { label: "Workplace accommodations", icon: Briefcase },
-        { label: "College support", icon: FileText },
-      ];
-    } else if (userType === "child") {
-      return [
-        { label: "Help my child with reading", icon: BookOpen },
-        { label: "Find a tutor for my child", icon: GraduationCap },
-        { label: "Get an evaluation for my child", icon: Users },
-        { label: "IEP or 504 Plan help", icon: FileText },
-        { label: "School accommodations", icon: Briefcase },
-      ];
-    } else {
-      return [
-        { label: "Help with reading", icon: BookOpen },
-        { label: "Find a tutor", icon: GraduationCap },
-        { label: "Get an evaluation", icon: Users },
-        { label: "IEP or 504 Plan help", icon: FileText },
-        { label: "Workplace accommodations", icon: Briefcase },
-      ];
-    }
-  };
+  const quickActions = QUICK_ACTIONS[userType] || QUICK_ACTIONS.other;
 
   return (
     <div className="h-screen flex flex-col bg-gradient-to-b from-blue-50 to-white">
 
       {/* Header */}
       <header className="bg-white border-b border-blue-100 shadow-sm flex-shrink-0">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
+        <div className="w-full px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+            <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
               <span className="text-white text-lg font-bold">L</span>
             </div>
             <div>
@@ -238,18 +246,18 @@ export function ChatView() {
               <p className="text-xs text-gray-400 leading-none">Resource Assistant</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <button
               onClick={() => router.push("/")}
               className="border-2 border-gray-300 hover:border-blue-400 hover:bg-blue-50 text-gray-700 font-semibold rounded-lg px-2 sm:px-4 py-2 flex items-center gap-1 sm:gap-2 text-sm sm:text-base transition">
               <ArrowLeft className="w-4 h-4" />
-              Change Role
+              <span className="hidden sm:inline">Change Role</span>
             </button>
             <button
               onClick={() => { setMessages([]); setSessionId(null); }}
               className="border-2 border-gray-300 hover:border-blue-400 hover:bg-blue-50 text-gray-700 font-semibold rounded-lg px-2 sm:px-4 py-2 flex items-center gap-1 sm:gap-2 text-sm sm:text-base transition">
               <RotateCcw className="w-4 h-4" />
-              Start Over
+              <span className="hidden sm:inline">Start Over</span>
             </button>
           </div>
         </div>
@@ -259,36 +267,36 @@ export function ChatView() {
       <div className="flex-1 flex overflow-hidden">
 
         {/* Sidebar */}
-        <aside className="hidden lg:block w-64 bg-white border-r border-blue-100 p-6 overflow-y-auto">
+        <aside className="hidden lg:block w-64 bg-white border-r border-blue-100 p-6 overflow-y-auto flex-shrink-0">
           <RecentTopics topics={recentTopics} />
         </aside>
 
         {/* Chat */}
-        <main className="flex-1 flex flex-col w-full">
+        <main className="flex-1 flex flex-col overflow-hidden">
 
           {/* Disclaimer */}
-          <div className="bg-blue-50 border-b-2 border-blue-200 px-6 py-3 flex-shrink-0">
+          <div className="bg-blue-50 border-b-2 border-blue-200 px-4 sm:px-6 py-3 flex-shrink-0">
             <div className="flex items-start gap-2">
               <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-              <p className="text-base text-blue-900">
+              <p className="text-sm text-blue-900">
                 <span className="font-semibold">Notice:</span> Responses are based on verified LDA of PA directory data. For urgent needs, please contact a specialist.
               </p>
             </div>
           </div>
 
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto px-6 py-6">
-            <div className="space-y-6 max-w-3xl mx-auto w-full">
+          {/* Messages — takes all available space */}
+          <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-6">
+            <div className="space-y-6 max-w-4xl mx-auto">
               {messages.length === 0 && !isLoading && (
-                <div className="flex flex-col items-center text-center py-16">
+                <div className="flex flex-col items-center justify-center h-full text-center py-16">
                   <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-100">
                     <span className="text-3xl">💬</span>
                   </div>
-                  <h2 className="text-xl font-semibold text-gray-900 mb-2">
+                  <h2 className="text-2xl font-semibold text-gray-900 mb-2">
                     Welcome to LDA of PA Chat
                   </h2>
-                  <p className="text-gray-500 max-w-md mx-auto">
-                    Ask me anything about learning disabilities, evaluations, IEPs, or finding support providers.
+                  <p className="text-gray-500 max-w-md mx-auto text-base">
+                    Ask me anything about learning disabilities, evaluations, IEPs, or finding support providers in Pennsylvania.
                   </p>
                 </div>
               )}
@@ -297,22 +305,36 @@ export function ChatView() {
                 <div key={message.id}>
                   {message.role === "user" ? (
                     <div className="flex justify-end">
-                      <div className="bg-blue-400 text-white rounded-2xl rounded-tr-sm px-4 sm:px-6 py-3 sm:py-4 max-w-[90%] sm:max-w-2xl shadow-sm">
-                        <p className="text-lg leading-relaxed">{message.content}</p>
+                      <div className="bg-blue-500 text-white rounded-2xl rounded-tr-sm px-5 py-4 max-w-[80%] shadow-sm">
+                        <p className="text-base leading-relaxed">{message.content}</p>
                       </div>
                     </div>
                   ) : message.noMatch ? (
                     <NoMatchState />
                   ) : (
                     <div className="flex justify-start">
-                      <div className="bg-white rounded-2xl rounded-tl-sm px-4 sm:px-6 py-4 sm:py-5 max-w-[90%] sm:max-w-2xl shadow-md border border-gray-100">
+                      <div className="bg-white rounded-2xl rounded-tl-sm px-6 py-5 w-full max-w-[85%] shadow-md border border-gray-100">
+
+                        {/* Response content formatted as cards */}
                         <div className="space-y-3">
-                          {message.content.replace(/\[PROVIDERS\]/gi, "").trim().split("\n").map((line, i) => (
-                            <p key={i} className="text-lg text-gray-800 leading-relaxed">{line || "\u00A0"}</p>
-                          ))}
+                          {(() => {
+                            const parts = message.content.split(" - ").map(p => p.trim()).filter(p => p.length > 0);
+                            return parts.map((part, i) =>
+                              i === 0 ? (
+                                <p key={i} className="text-base text-gray-800 leading-relaxed">{part}</p>
+                              ) : (
+                                <div key={i} className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+                                  <span className="text-blue-500 font-bold mt-0.5">→</span>
+                                  <p className="text-sm text-gray-800 leading-relaxed">{part}</p>
+                                </div>
+                              )
+                            );
+                          })()}
                         </div>
+
+                        {/* Escalation card */}
                         {message.escalate && (
-                          <div className="my-3 rounded-lg border-2 border-amber-300 bg-amber-50 p-4">
+                          <div className="mt-4 rounded-lg border-2 border-amber-300 bg-amber-50 p-4">
                             <div className="flex items-start gap-3">
                               <span className="text-2xl">⚠️</span>
                               <div>
@@ -321,56 +343,46 @@ export function ChatView() {
                                 <div className="mt-3 space-y-1 text-sm">
                                   <p><span className="font-medium">Phone:</span> (484) 487-0300</p>
                                   <p><span className="font-medium">Email:</span>{" "}
-                                    <a href="mailto:info@ldaofpa.org" className="text-blue-600 hover:underline">info@ldaofpa.org</a>
+                                    <a href="mailto:info@ldapa.org" className="text-blue-600 hover:underline">info@ldapa.org</a>
                                   </p>
-                                  <p><span className="font-medium">Hours:</span> Mon-Fri 9am-5pm ET</p>
+                                  <p><span className="font-medium">Hours:</span> Mon–Fri 9am–5pm ET</p>
                                 </div>
                               </div>
                             </div>
                           </div>
                         )}
 
+                        {/* Provider cards */}
                         {message.providers && message.providers.length > 0 && (
                           <div className="mt-4">
-                            <h3 className="text-lg font-bold text-gray-900 mb-3">Recommended Providers</h3>
+                            <h3 className="text-base font-bold text-gray-900 mb-3">Recommended Providers</h3>
                             <div className="space-y-3">
                               {message.providers.map((provider) => (
-                                <div key={provider.id} className="bg-blue-50 border-2 border-blue-200 rounded-xl p-5">
+                                <div key={provider.id} className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4">
                                   <div className="flex items-start justify-between gap-4 mb-2">
-                                    <h4 className="text-lg font-bold text-gray-900">{provider.name}</h4>
+                                    <h4 className="text-base font-bold text-gray-900">{provider.name}</h4>
                                     <div className="flex items-center gap-1 bg-green-100 border border-green-400 rounded-full px-3 py-1 flex-shrink-0">
-                                      <span className="text-sm font-semibold text-green-700">✓ Verified</span>
+                                      <span className="text-xs font-semibold text-green-700">✓ Verified</span>
                                     </div>
                                   </div>
-                                  <div className="space-y-1 mb-3 text-base text-gray-700">
-                                    {provider.profession_name && (
-                                      <p><span className="font-semibold">Type:</span> {provider.profession_name.replace(/_/g, " ")}</p>
-                                    )}
-                                    <p><span className="font-semibold">Location:</span> {provider.city}{provider.state_code ? `, ${provider.state_code}` : ""}{provider.zip_code ? ` ${provider.zip_code}` : ""}</p>
-                                    {provider.price_per_visit && (
-                                      <p><span className="font-semibold">Cost:</span> {provider.price_per_visit}</p>
-                                    )}
-                                    {provider.sliding_scale && (
-                                      <p className="text-green-700 font-medium">Sliding scale available</p>
-                                    )}
-                                    {provider.insurance_accepted && (
-                                      <p><span className="font-semibold">Insurance:</span> {provider.insurance_accepted}</p>
-                                    )}
+                                  <div className="space-y-1 mb-3 text-sm text-gray-700">
+                                    <p><span className="font-semibold">Location:</span> {provider.city}</p>
+                                    <p><span className="font-semibold">Cost:</span> {provider.cost_tier}</p>
                                   </div>
                                   <button
                                     onClick={() => setSelectedProvider({
                                       id: provider.id,
                                       name: provider.name,
-                                      organization: provider.profession_name?.replace(/_/g, " ") || "",
-                                      serviceType: provider.services || provider.training || "",
-                                      location: `${provider.city || ""}${provider.state_code ? `, ${provider.state_code}` : ""}`,
-                                      cost: provider.price_per_visit || "Contact for pricing",
+                                      organization: provider.organization || "",
+                                      serviceType: provider.service_types?.join(", ") || "",
+                                      location: provider.city,
+                                      cost: provider.cost_tier,
                                       phone: provider.phone || "",
                                       website: provider.website || "",
                                       verified: true,
                                       verifiedDate: "2026",
                                     })}
-                                    className="bg-blue-500 hover:bg-blue-600 text-white rounded-lg px-5 py-2 font-semibold transition">
+                                    className="bg-blue-500 hover:bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-semibold transition">
                                     Learn More
                                   </button>
                                 </div>
@@ -395,17 +407,20 @@ export function ChatView() {
                           </div>
                         )}
 
-                        {/* Follow-up suggestion chips */}
+                        {/* Follow-up chips */}
                         {message.followUps && message.followUps.length > 0 && (
-                          <div className="mt-4 flex flex-wrap gap-2">
-                            {message.followUps.map((followUp, i) => (
-                              <button
-                                key={i}
-                                onClick={() => handleSendMessage(followUp)}
-                                className="text-sm bg-blue-50 border border-blue-200 text-blue-700 rounded-full px-4 py-1.5 hover:bg-blue-100 hover:border-blue-400 transition">
-                                💬 {followUp}
-                              </button>
-                            ))}
+                          <div className="mt-4">
+                            <p className="text-xs text-gray-400 mb-2">Suggested follow-ups:</p>
+                            <div className="flex flex-wrap gap-2">
+                              {message.followUps.map((followUp, i) => (
+                                <button
+                                  key={i}
+                                  onClick={() => handleSendMessage(followUp)}
+                                  className="text-sm bg-blue-50 border border-blue-200 text-blue-700 rounded-full px-4 py-1.5 hover:bg-blue-100 hover:border-blue-400 transition">
+                                  💬 {followUp}
+                                </button>
+                              ))}
+                            </div>
                           </div>
                         )}
                       </div>
@@ -429,17 +444,17 @@ export function ChatView() {
             </div>
           </div>
 
-          {/* Quick Actions */}
-          <div className="border-t border-blue-100 bg-white px-6 py-4 flex-shrink-0">
-            <p className="text-base font-semibold text-gray-700 mb-3">Quick Actions</p>
-            <div className="flex gap-3 overflow-x-auto pb-2 flex-nowrap">
-              {getQuickActions().map((action, index) => {
+          {/* Quick Actions — role-specific, no redundant bottom bar */}
+          <div className="border-t border-blue-100 bg-white px-4 sm:px-6 py-3 flex-shrink-0">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Quick Actions</p>
+            <div className="flex gap-2 overflow-x-auto pb-1 flex-nowrap" style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}>
+              {quickActions.map((action, index) => {
                 const Icon = action.icon;
                 return (
                   <button
                     key={index}
-                    onClick={() => handleSendMessage(buildLeadingMessage(action.label))}
-                    className="rounded-full border-2 border-blue-300 bg-white hover:bg-blue-50 hover:border-blue-400 px-5 py-2 flex items-center gap-2 whitespace-nowrap font-medium text-gray-800 flex-shrink-0 transition">
+                    onClick={() => handleSendMessage(action.message)}
+                    className="rounded-full border-2 border-blue-300 bg-white hover:bg-blue-50 hover:border-blue-400 px-4 py-2 flex items-center gap-2 whitespace-nowrap text-sm font-medium text-gray-800 flex-shrink-0 transition">
                     <Icon className="w-4 h-4 text-blue-500" />
                     {action.label}
                   </button>
@@ -448,22 +463,11 @@ export function ChatView() {
             </div>
           </div>
 
-          {/* Input Bar */}
-          <div className="border-t border-blue-100 bg-white px-6 py-5 flex-shrink-0">
-            <div className="flex gap-3 overflow-x-auto pb-1 mb-4 flex-nowrap">
-              {["Find a Provider", "General Info", "Legal & Eval Info"].map((label) => (
-                <button
-                  key={label}
-                  onClick={() => handleSendMessage(buildLeadingMessage(label))}
-                  className="rounded-full border-2 border-blue-400 bg-white hover:bg-blue-50 px-5 py-2 font-semibold text-blue-600 flex-shrink-0 transition">
-                  {label}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex flex-row gap-3 items-end">
+          {/* Input Bar — no redundant shortcut buttons */}
+          <div className="border-t border-blue-100 bg-white px-4 sm:px-6 py-4 flex-shrink-0">
+            <div className="flex flex-row gap-3 items-end max-w-5xl mx-auto">
               <div className="w-48 flex-shrink-0">
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">
                   Location (Optional)
                 </label>
                 <div className="relative">
@@ -472,7 +476,7 @@ export function ChatView() {
                     value={locationInput}
                     onChange={(e) => setLocationInput(e.target.value)}
                     placeholder="City or ZIP"
-                    className="w-full text-base pl-10 pr-4 py-3 rounded-xl border-2 border-gray-300 focus:border-blue-400 focus:outline-none h-14"/>
+                    className="w-full text-sm pl-10 pr-4 py-3 rounded-xl border-2 border-gray-300 focus:border-blue-400 focus:outline-none h-12"/>
                 </div>
               </div>
 
@@ -482,23 +486,22 @@ export function ChatView() {
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendMessage(inputValue); }}}
                   placeholder="Ask a question…"
-                  className="w-full text-lg p-4 rounded-xl border-2 border-gray-300 focus:border-blue-400 focus:outline-none h-14"/>
+                  className="w-full text-base p-3 rounded-xl border-2 border-gray-300 focus:border-blue-400 focus:outline-none h-12"/>
               </div>
 
               <button
                 onClick={() => handleSendMessage(inputValue)}
                 disabled={!inputValue.trim() || isLoading}
-                className="bg-blue-500 hover:bg-blue-600 text-white rounded-xl px-6 h-14 font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed transition">
+                className="bg-blue-500 hover:bg-blue-600 text-white rounded-xl px-5 h-12 font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed transition flex-shrink-0">
                 <Send className="w-5 h-5" />
               </button>
-            </div>
 
-            <div className="mt-4 text-center">
+              {/* Contact button — opens draft email modal */}
               <button
-                onClick={() => handleSendMessage("I need to speak with a person at LDA of PA")}
-                className="border-2 border-blue-400 text-blue-600 hover:bg-blue-50 rounded-lg px-6 py-2 font-semibold flex items-center gap-2 mx-auto transition">
-                <Phone className="w-4 h-4" />
-                Contact LDA of PA
+                onClick={() => setShowContactModal(true)}
+                className="border-2 border-blue-400 text-blue-600 hover:bg-blue-50 rounded-xl px-4 h-12 font-semibold flex items-center gap-2 flex-shrink-0 transition whitespace-nowrap">
+                <Mail className="w-4 h-4" />
+                <span className="hidden sm:inline">Contact LDA of PA</span>
               </button>
             </div>
           </div>
@@ -508,6 +511,10 @@ export function ChatView() {
 
       {selectedProvider && (
         <ProviderModal provider={selectedProvider} onClose={() => setSelectedProvider(null)} />
+      )}
+
+      {showContactModal && (
+        <ContactModal userType={userType} onClose={() => setShowContactModal(false)} />
       )}
     </div>
   );
