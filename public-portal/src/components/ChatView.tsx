@@ -74,6 +74,67 @@ const FOLLOW_UPS: Record<string, string[]> = {
   ],
 };
 
+type ContentSegment = { type: "p"; text: string } | { type: "ul"; items: string[] };
+
+function splitSentences(text: string): string[] {
+  return text.split(/(?<=[.?!])\s+(?=[A-Z])/).map(s => s.trim()).filter(Boolean);
+}
+
+function parseAssistantContent(content: string): ContentSegment[] {
+  const bulletSplit = /(?:\r?\n\s*[-*•]\s+|\s+-\s+)/;
+  const parts = content.split(bulletSplit).map(p => p.trim()).filter(Boolean);
+  if (parts.length <= 1) return [{ type: "p", text: parts[0] || "" }];
+
+  const [intro, ...rawItems] = parts;
+  const segments: ContentSegment[] = [{ type: "p", text: intro }];
+  let currentGroup: string[] = [];
+
+  const flush = () => {
+    if (currentGroup.length) {
+      segments.push({ type: "ul", items: currentGroup });
+      currentGroup = [];
+    }
+  };
+
+  rawItems.forEach((item, i) => {
+    const isLast = i === rawItems.length - 1;
+    const sentences = splitSentences(item);
+
+    let splitIdx = -1;
+    if (!isLast) {
+      // Transition: a trailing sentence ending with ":" signals a shift to a new bullet group
+      for (let s = 1; s < sentences.length; s++) {
+        if (sentences[s].endsWith(":")) { splitIdx = s; break; }
+      }
+    } else if (sentences.length > 1 && sentences[0].endsWith("?")) {
+      // Last item: a question bullet followed by prose → split off the prose as a tail paragraph
+      splitIdx = 1;
+    }
+
+    if (splitIdx > 0) {
+      currentGroup.push(sentences.slice(0, splitIdx).join(" "));
+      flush();
+      segments.push({ type: "p", text: sentences.slice(splitIdx).join(" ") });
+    } else {
+      currentGroup.push(item);
+    }
+  });
+
+  flush();
+  return segments;
+}
+
+function renderInlineMarkdown(text: string) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, i) =>
+    part.startsWith("**") && part.endsWith("**") ? (
+      <strong key={i}>{part.slice(2, -2)}</strong>
+    ) : (
+      <span key={i}>{part}</span>
+    )
+  );
+}
+
 function getFollowUps(message: string): string[] {
   const lower = message.toLowerCase();
   if (lower.includes("tutor")) return FOLLOW_UPS.tutor;
@@ -315,21 +376,40 @@ export function ChatView() {
                     <div className="flex justify-start">
                       <div className="bg-white rounded-2xl rounded-tl-sm px-6 py-5 w-full max-w-[85%] shadow-md border border-gray-100">
 
-                        {/* Response content formatted as cards */}
+                        {/* Response content: alternating paragraphs and bulleted sections */}
                         <div className="space-y-3">
-                          {(() => {
-                            const parts = message.content.split(" - ").map(p => p.trim()).filter(p => p.length > 0);
-                            return parts.map((part, i) =>
-                              i === 0 ? (
-                                <p key={i} className="text-base text-gray-800 leading-relaxed">{part}</p>
-                              ) : (
-                                <div key={i} className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
-                                  <span className="text-blue-500 font-bold mt-0.5">→</span>
-                                  <p className="text-sm text-gray-800 leading-relaxed">{part}</p>
+                          {parseAssistantContent(message.content).map((seg, i) => {
+                            if (seg.type === "p") {
+                              return (
+                                <p key={i} className="text-base text-gray-800 leading-relaxed">
+                                  {renderInlineMarkdown(seg.text)}
+                                </p>
+                              );
+                            }
+                            const allQuestions = seg.items.length > 0 && seg.items.every(it => it.trim().endsWith("?"));
+                            if (allQuestions) {
+                              return (
+                                <div key={i} className="flex flex-col gap-2 pt-1">
+                                  {seg.items.map((item, j) => (
+                                    <button
+                                      key={j}
+                                      onClick={() => handleSendMessage(item)}
+                                      disabled={isLoading}
+                                      className="text-left text-sm bg-blue-50 hover:bg-blue-100 border border-blue-200 text-gray-800 rounded-xl px-4 py-2.5 transition disabled:opacity-60 disabled:cursor-not-allowed">
+                                      {renderInlineMarkdown(item)}
+                                    </button>
+                                  ))}
                                 </div>
-                              )
+                              );
+                            }
+                            return (
+                              <ul key={i} className="list-disc pl-6 space-y-2 text-base text-gray-800 leading-relaxed marker:text-blue-500">
+                                {seg.items.map((item, j) => (
+                                  <li key={j}>{renderInlineMarkdown(item)}</li>
+                                ))}
+                              </ul>
                             );
-                          })()}
+                          })}
                         </div>
 
                         {/* Escalation card */}
@@ -366,17 +446,17 @@ export function ChatView() {
                                     </div>
                                   </div>
                                   <div className="space-y-1 mb-3 text-sm text-gray-700">
-                                    <p><span className="font-semibold">Location:</span> {provider.city}</p>
-                                    <p><span className="font-semibold">Cost:</span> {provider.cost_tier}</p>
+                                    <p><span className="font-semibold">Location:</span> {provider.city || "—"}</p>
+                                    <p><span className="font-semibold">Cost:</span> {provider.price_per_visit || "Contact for pricing"}</p>
                                   </div>
                                   <button
                                     onClick={() => setSelectedProvider({
                                       id: provider.id,
                                       name: provider.name,
-                                      organization: provider.organization || "",
-                                      serviceType: provider.service_types?.join(", ") || "",
-                                      location: provider.city,
-                                      cost: provider.cost_tier,
+                                      organization: provider.profession_name || "",
+                                      serviceType: provider.services || "",
+                                      location: provider.city || "",
+                                      cost: provider.price_per_visit || "Contact for pricing",
                                       phone: provider.phone || "",
                                       website: provider.website || "",
                                       verified: true,
