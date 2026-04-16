@@ -7,6 +7,7 @@ import {
   Users, FileText, Briefcase, ArrowLeft, MapPin, Info, Mail,
 } from "lucide-react";
 import { sendChatMessage, submitFeedback, type ChatMessage, type ProviderCard } from "@/lib/api";
+import ReactMarkdown from "react-markdown";
 import { ProviderModal } from "./ProviderModal";
 import { NoMatchState } from "./NoMatchState";
 import { RecentTopics } from "./RecentTopics";
@@ -74,66 +75,6 @@ const FOLLOW_UPS: Record<string, string[]> = {
   ],
 };
 
-type ContentSegment = { type: "p"; text: string } | { type: "ul"; items: string[] };
-
-function splitSentences(text: string): string[] {
-  return text.split(/(?<=[.?!])\s+(?=[A-Z])/).map(s => s.trim()).filter(Boolean);
-}
-
-function parseAssistantContent(content: string): ContentSegment[] {
-  const bulletSplit = /(?:\r?\n\s*[-*•]\s+|\s+-\s+)/;
-  const parts = content.split(bulletSplit).map(p => p.trim()).filter(Boolean);
-  if (parts.length <= 1) return [{ type: "p", text: parts[0] || "" }];
-
-  const [intro, ...rawItems] = parts;
-  const segments: ContentSegment[] = [{ type: "p", text: intro }];
-  let currentGroup: string[] = [];
-
-  const flush = () => {
-    if (currentGroup.length) {
-      segments.push({ type: "ul", items: currentGroup });
-      currentGroup = [];
-    }
-  };
-
-  rawItems.forEach((item, i) => {
-    const isLast = i === rawItems.length - 1;
-    const sentences = splitSentences(item);
-
-    let splitIdx = -1;
-    if (!isLast) {
-      // Transition: a trailing sentence ending with ":" signals a shift to a new bullet group
-      for (let s = 1; s < sentences.length; s++) {
-        if (sentences[s].endsWith(":")) { splitIdx = s; break; }
-      }
-    } else if (sentences.length > 1 && sentences[0].endsWith("?")) {
-      // Last item: a question bullet followed by prose → split off the prose as a tail paragraph
-      splitIdx = 1;
-    }
-
-    if (splitIdx > 0) {
-      currentGroup.push(sentences.slice(0, splitIdx).join(" "));
-      flush();
-      segments.push({ type: "p", text: sentences.slice(splitIdx).join(" ") });
-    } else {
-      currentGroup.push(item);
-    }
-  });
-
-  flush();
-  return segments;
-}
-
-function renderInlineMarkdown(text: string) {
-  const parts = text.split(/(\*\*[^*]+\*\*)/g);
-  return parts.map((part, i) =>
-    part.startsWith("**") && part.endsWith("**") ? (
-      <strong key={i}>{part.slice(2, -2)}</strong>
-    ) : (
-      <span key={i}>{part}</span>
-    )
-  );
-}
 
 function getFollowUps(message: string): string[] {
   const lower = message.toLowerCase();
@@ -376,40 +317,24 @@ export function ChatView() {
                     <div className="flex justify-start">
                       <div className="bg-white rounded-2xl rounded-tl-sm px-6 py-5 w-full max-w-[85%] shadow-md border border-gray-100">
 
-                        {/* Response content: alternating paragraphs and bulleted sections */}
-                        <div className="space-y-3">
-                          {parseAssistantContent(message.content).map((seg, i) => {
-                            if (seg.type === "p") {
-                              return (
-                                <p key={i} className="text-base text-gray-800 leading-relaxed">
-                                  {renderInlineMarkdown(seg.text)}
-                                </p>
-                              );
-                            }
-                            const allQuestions = seg.items.length > 0 && seg.items.every(it => it.trim().endsWith("?"));
-                            if (allQuestions) {
-                              return (
-                                <div key={i} className="flex flex-col gap-2 pt-1">
-                                  {seg.items.map((item, j) => (
-                                    <button
-                                      key={j}
-                                      onClick={() => handleSendMessage(item)}
-                                      disabled={isLoading}
-                                      className="text-left text-sm bg-blue-50 hover:bg-blue-100 border border-blue-200 text-gray-800 rounded-xl px-4 py-2.5 transition disabled:opacity-60 disabled:cursor-not-allowed">
-                                      {renderInlineMarkdown(item)}
-                                    </button>
-                                  ))}
-                                </div>
-                              );
-                            }
-                            return (
-                              <ul key={i} className="list-disc pl-6 space-y-2 text-base text-gray-800 leading-relaxed marker:text-blue-500">
-                                {seg.items.map((item, j) => (
-                                  <li key={j}>{renderInlineMarkdown(item)}</li>
-                                ))}
-                              </ul>
-                            );
-                          })}
+                        {/* Response content rendered as markdown */}
+                        <div className="space-y-3 text-base text-gray-800 leading-relaxed">
+                          <ReactMarkdown
+                            components={{
+                              p: ({ children }) => <p className="text-base text-gray-800 leading-relaxed">{children}</p>,
+                              strong: ({ children }) => <strong className="font-semibold text-gray-900">{children}</strong>,
+                              em: ({ children }) => <em className="italic">{children}</em>,
+                              ul: ({ children }) => <ul className="list-disc pl-6 space-y-2 text-base text-gray-800 leading-relaxed marker:text-blue-500">{children}</ul>,
+                              ol: ({ children }) => <ol className="list-decimal pl-6 space-y-2 text-base text-gray-800 leading-relaxed">{children}</ol>,
+                              li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                              a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{children}</a>,
+                              h3: ({ children }) => <h3 className="text-lg font-semibold text-gray-900 mt-2">{children}</h3>,
+                              h4: ({ children }) => <h4 className="text-base font-semibold text-gray-900 mt-2">{children}</h4>,
+                              blockquote: ({ children }) => <blockquote className="border-l-4 border-blue-200 pl-4 italic text-gray-600">{children}</blockquote>,
+                            }}
+                          >
+                            {message.content.replace(/\[PROVIDERS\]/gi, "").trim()}
+                          </ReactMarkdown>
                         </div>
 
                         {/* Escalation card */}
