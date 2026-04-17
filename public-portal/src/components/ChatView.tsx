@@ -7,7 +7,6 @@ import {
   Users, FileText, Briefcase, ArrowLeft, MapPin, Info, Mail,
 } from "lucide-react";
 import { sendChatMessage, submitFeedback, type ChatMessage, type ProviderCard } from "@/lib/api";
-import ReactMarkdown from "react-markdown";
 import { ProviderModal } from "./ProviderModal";
 import { NoMatchState } from "./NoMatchState";
 import { RecentTopics } from "./RecentTopics";
@@ -75,7 +74,6 @@ const FOLLOW_UPS: Record<string, string[]> = {
   ],
 };
 
-
 function getFollowUps(message: string): string[] {
   const lower = message.toLowerCase();
   if (lower.includes("tutor")) return FOLLOW_UPS.tutor;
@@ -86,7 +84,7 @@ function getFollowUps(message: string): string[] {
   return FOLLOW_UPS.default;
 }
 
-// Role-specific quick actions with proper backend-ready messages
+// Role-specific quick actions 
 const QUICK_ACTIONS: Record<string, { label: string; icon: any; message: string }[]> = {
   myself: [
     { label: "Reading & Dyslexia", icon: BookOpen, message: "I'm an adult with reading difficulties or dyslexia and I'm looking for support for myself. Can you ask me a few questions to help find the right resources?" },
@@ -173,13 +171,13 @@ export function ChatView() {
   const handleSendMessage = useCallback(async (text: string) => {
     if (!text.trim() || isLoading) return;
 
-    // Prepend role context
+    // Role context
     const contextualText = `[User is seeking help for: ${roleLabel}] ${text}`;
 
     const userMsg: DisplayMessage = {
       id: `user-${Date.now()}`,
       role: "user",
-      content: text, // show clean text to user
+      content: text, 
     };
     setMessages((prev) => [...prev, userMsg]);
     setInputValue("");
@@ -195,7 +193,7 @@ export function ChatView() {
         content: m.content,
       }));
 
-      // Send contextual text to backend, show clean text in UI
+      // Send contextual text to backend
       const response = await sendChatMessage(contextualText, history, sessionId || undefined);
       setSessionId(response.session_id);
 
@@ -251,13 +249,13 @@ export function ChatView() {
           <div className="flex items-center gap-2 sm:gap-3">
             <button
               onClick={() => router.push("/")}
-              className="border-2 border-gray-300 hover:border-blue-400 hover:bg-blue-50 text-gray-700 font-semibold rounded-lg px-2 sm:px-4 py-2 flex items-center gap-1 sm:gap-2 text-sm sm:text-base transition">
+              className="bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-lg px-3 sm:px-5 py-2 flex items-center gap-1 sm:gap-2 text-sm sm:text-base transition shadow-md">
               <ArrowLeft className="w-4 h-4" />
               <span className="hidden sm:inline">Change Role</span>
             </button>
             <button
               onClick={() => { setMessages([]); setSessionId(null); }}
-              className="border-2 border-gray-300 hover:border-blue-400 hover:bg-blue-50 text-gray-700 font-semibold rounded-lg px-2 sm:px-4 py-2 flex items-center gap-1 sm:gap-2 text-sm sm:text-base transition">
+              className="bg-white border-2 border-white/80 text-gray-800 hover:bg-gray-100 font-semibold rounded-lg px-3 sm:px-5 py-2 flex items-center gap-1 sm:gap-2 text-sm sm:text-base transition shadow-md">
               <RotateCcw className="w-4 h-4" />
               <span className="hidden sm:inline">Start Over</span>
             </button>
@@ -317,24 +315,21 @@ export function ChatView() {
                     <div className="flex justify-start">
                       <div className="bg-white rounded-2xl rounded-tl-sm px-6 py-5 w-full max-w-[85%] shadow-md border border-gray-100">
 
-                        {/* Response content rendered as markdown */}
-                        <div className="space-y-3 text-base text-gray-800 leading-relaxed">
-                          <ReactMarkdown
-                            components={{
-                              p: ({ children }) => <p className="text-base text-gray-800 leading-relaxed">{children}</p>,
-                              strong: ({ children }) => <strong className="font-semibold text-gray-900">{children}</strong>,
-                              em: ({ children }) => <em className="italic">{children}</em>,
-                              ul: ({ children }) => <ul className="list-disc pl-6 space-y-2 text-base text-gray-800 leading-relaxed marker:text-blue-500">{children}</ul>,
-                              ol: ({ children }) => <ol className="list-decimal pl-6 space-y-2 text-base text-gray-800 leading-relaxed">{children}</ol>,
-                              li: ({ children }) => <li className="leading-relaxed">{children}</li>,
-                              a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{children}</a>,
-                              h3: ({ children }) => <h3 className="text-lg font-semibold text-gray-900 mt-2">{children}</h3>,
-                              h4: ({ children }) => <h4 className="text-base font-semibold text-gray-900 mt-2">{children}</h4>,
-                              blockquote: ({ children }) => <blockquote className="border-l-4 border-blue-200 pl-4 italic text-gray-600">{children}</blockquote>,
-                            }}
-                          >
-                            {message.content.replace(/\[PROVIDERS\]/gi, "").trim()}
-                          </ReactMarkdown>
+                        {/* Response content formatted as cards */}
+                        <div className="space-y-3">
+                          {(() => {
+                            const parts = message.content.split(" - ").map(p => p.trim()).filter(p => p.length > 0);
+                            return parts.map((part, i) =>
+                              i === 0 ? (
+                                <p key={i} className="text-base text-gray-800 leading-relaxed">{part}</p>
+                              ) : (
+                                <div key={i} className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+                                  <span className="text-blue-500 font-bold mt-0.5">→</span>
+                                  <p className="text-sm text-gray-800 leading-relaxed">{part}</p>
+                                </div>
+                              )
+                            );
+                          })()}
                         </div>
 
                         {/* Escalation card */}
@@ -371,17 +366,17 @@ export function ChatView() {
                                     </div>
                                   </div>
                                   <div className="space-y-1 mb-3 text-sm text-gray-700">
-                                    <p><span className="font-semibold">Location:</span> {provider.city || "—"}</p>
-                                    <p><span className="font-semibold">Cost:</span> {provider.price_per_visit || "Contact for pricing"}</p>
+                                    <p><span className="font-semibold">Location:</span> {provider.city}</p>
+                                    <p><span className="font-semibold">Cost:</span> {provider.cost_tier}</p>
                                   </div>
                                   <button
                                     onClick={() => setSelectedProvider({
                                       id: provider.id,
                                       name: provider.name,
-                                      organization: provider.profession_name || "",
-                                      serviceType: provider.services || "",
-                                      location: provider.city || "",
-                                      cost: provider.price_per_visit || "Contact for pricing",
+                                      organization: provider.organization || "",
+                                      serviceType: provider.service_types?.join(", ") || "",
+                                      location: provider.city,
+                                      cost: provider.cost_tier,
                                       phone: provider.phone || "",
                                       website: provider.website || "",
                                       verified: true,
@@ -415,13 +410,15 @@ export function ChatView() {
                         {/* Follow-up chips */}
                         {message.followUps && message.followUps.length > 0 && (
                           <div className="mt-4">
-                            <p className="text-xs text-gray-400 mb-2">Suggested follow-ups:</p>
+                            <p className="text-xs font-semibold text-blue-600 mb-2 uppercase tracking-wide">
+                              Suggested follow-ups:
+                            </p>
                             <div className="flex flex-wrap gap-2">
                               {message.followUps.map((followUp, i) => (
                                 <button
                                   key={i}
                                   onClick={() => handleSendMessage(followUp)}
-                                  className="text-sm bg-blue-50 border border-blue-200 text-blue-700 rounded-full px-4 py-1.5 hover:bg-blue-100 hover:border-blue-400 transition">
+                                  className="text-sm bg-blue-50 border-2 border-blue-300 text-blue-700 rounded-full px-4 py-2 hover:bg-blue-100 hover:border-blue-500 font-medium transition">
                                   💬 {followUp}
                                 </button>
                               ))}
@@ -459,7 +456,7 @@ export function ChatView() {
                   <button
                     key={index}
                     onClick={() => handleSendMessage(action.message)}
-                    className="rounded-full border-2 border-blue-300 bg-white hover:bg-blue-50 hover:border-blue-400 px-4 py-2 flex items-center gap-2 whitespace-nowrap text-sm font-medium text-gray-800 flex-shrink-0 transition">
+                    className="rounded-full border-2 border-blue-300 bg-white hover:bg-blue-50 hover:border-blue-400 px-4 py-3 min-h-[44px] flex items-center gap-2 whitespace-nowrap text-sm font-medium text-gray-800 flex-shrink-0 transition">
                     <Icon className="w-4 h-4 text-blue-500" />
                     {action.label}
                   </button>
