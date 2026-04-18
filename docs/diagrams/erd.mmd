@@ -1,0 +1,81 @@
+erDiagram
+    providers {
+        string id PK "UUID"
+        string first_name
+        string last_name
+        string name "computed first+last"
+        string listing_type "Individual|Company"
+        string profession_name "Tutor|Health_Professional|Lawyer|School|Advocate"
+        string services
+        string training
+        string credentials
+        string license
+        string address
+        string city
+        string state
+        string state_code "PA"
+        string zip_code
+        float lat
+        float lon
+        string age_range_served
+        string grades_offered
+        string price_per_visit
+        int sliding_scale "0|1"
+        string insurance_accepted
+        int ld_adhd_specialty "0|1"
+        int learning_difference_support "0|1"
+        int adhd_support "0|1"
+        string student_body_type
+        string total_size
+        string average_class_size
+        string religion
+        string phone
+        string email
+        string website
+        string profile_url
+        string verification_status "unverified|verified|archived"
+        string last_verified_at
+        string staff_notes
+        string created_at
+        string updated_at
+        int is_deleted "0|1"
+    }
+
+    chat_sessions {
+        string id PK "UUID"
+        string user_location "JSON city/zip"
+        string started_at
+        string last_message_at
+        int message_count
+        int escalated "0|1"
+    }
+
+    chat_messages {
+        string id PK "UUID"
+        string session_id FK
+        string role "user|assistant"
+        string content
+        string providers_shown "JSON array of provider IDs"
+        string created_at
+    }
+
+    chat_feedback {
+        string id PK "UUID"
+        string message_id FK
+        string session_id FK
+        string rating "up|down"
+        string created_at
+    }
+
+    admin_users {
+        string id PK
+        string email UK
+        string password_hash "bcrypt"
+        string name
+        string created_at
+    }
+
+    chat_sessions ||--o{ chat_messages : "1..N"
+    chat_messages ||--o{ chat_feedback : "0..N"
+    chat_sessions ||--o{ chat_feedback : "0..N"
+    chat_messages }o..o{ providers : "references via providers_shown JSON"

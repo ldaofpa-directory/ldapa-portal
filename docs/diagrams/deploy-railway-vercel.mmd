@@ -1,0 +1,25 @@
+graph LR
+    subgraph GitHub["GitHub (ldaofpa-directory/ldapa-portal)"]
+        Repo[Source of truth\nmain branch]
+    end
+
+    subgraph VercelProjects["Vercel"]
+        VPP["Project: Public Portal\nRoot dir: public-portal\nldapa-public-portal.vercel.app"]
+        VAP["Project: Admin Panel\nRoot dir: admin-panel\nldapa-admin-panel.vercel.app"]
+    end
+
+    subgraph RailwayProject["Railway Project"]
+        RB["Service: Backend\nRoot dir: backend\nldapa-portal-production.up.railway.app"]
+        RPG[("Service: PostgreSQL\nmanaged plugin\nDATABASE_URL injected")]
+        RB -.->|DATABASE_URL| RPG
+    end
+
+    OpenAI[OpenAI Platform]
+
+    Repo -->|push to main\ntriggers deploy| VPP
+    Repo -->|push to main\ntriggers deploy| VAP
+    Repo -->|push to main\ntriggers deploy| RB
+
+    VPP -->|NEXT_PUBLIC_API_URL| RB
+    VAP -->|NEXT_PUBLIC_API_URL + JWT| RB
+    RB -->|OPENAI_API_KEY| OpenAI

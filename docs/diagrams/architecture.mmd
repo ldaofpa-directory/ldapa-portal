@@ -1,38 +1,40 @@
 graph TB
     subgraph Internet["Public Internet"]
-        User([User])
-        Admin([Admin])
+        User([Parent / Caregiver / Adult])
+        Admin([LDA of PA Staff])
     end
 
-    subgraph Frontend["Frontend Layer"]
-        PP["Public Portal\nNext.js :3000"]
-        AP["Admin Panel\nNext.js :3001"]
+    subgraph Vercel["Vercel (CDN + SSR)"]
+        PP["Public Portal\nNext.js 16\nldapa-public-portal.vercel.app"]
+        AP["Admin Panel\nNext.js 16\nldapa-admin-panel.vercel.app"]
     end
 
-    subgraph Backend["FastAPI Backend :8000"]
-        CR["Chat Router\n/api/*"]
-        PR["Providers Router\n/api/admin/*"]
-        DR["Dashboard Router\n/api/admin/dashboard/*"]
+    subgraph Railway["Railway (Backend + DB)"]
+        subgraph API["FastAPI Backend :8000"]
+            CR["Chat Router\n/api/*"]
+            PR["Providers Router\n/api/admin/*"]
+            DR["Dashboard Router\n/api/admin/dashboard/*"]
 
-        subgraph Services["Service Layer"]
-            LLM["LLM Service\nFilter Extraction\nResponse Generation"]
-            PS["Provider Search\nGeo + Text + Broadening"]
+            subgraph Services["Service Layer"]
+                LLM["LLM Service\nFilter Extraction\nResponse Generation"]
+                PS["Provider Search\nGeo + Text + Broadening"]
+            end
         end
 
-        DB[("SQLite\nldapa.db")]
+        PG[("PostgreSQL\nManaged by Railway")]
     end
 
-    OpenAI["OpenAI API\ngpt-5-mini"]
+    OpenAI["OpenAI Platform\ngpt-5-mini (Responses API)"]
 
-    User -->|HTTP/JSON| PP
-    Admin -->|HTTP/JSON + JWT| AP
-    PP --> CR
-    AP --> PR
-    AP --> DR
+    User -->|HTTPS| PP
+    Admin -->|HTTPS + JWT| AP
+    PP -->|JSON over HTTPS| CR
+    AP -->|JSON over HTTPS| PR
+    AP -->|JSON over HTTPS| DR
     CR --> LLM
     CR --> PS
     PR --> PS
-    DR --> DB
-    LLM -->|Responses API| OpenAI
-    LLM --> PS
-    PS --> DB
+    DR --> PG
+    LLM -->|HTTPS| OpenAI
+    PS --> PG
+    CR --> PG
