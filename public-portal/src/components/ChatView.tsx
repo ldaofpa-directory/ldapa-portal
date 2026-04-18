@@ -366,19 +366,19 @@ export function ChatView() {
                                     </div>
                                   </div>
                                   <div className="space-y-1 mb-3 text-sm text-gray-700">
-                                    <p><span className="font-semibold">Location:</span> {provider.city}</p>
-                                    <p><span className="font-semibold">Cost:</span> {provider.cost_tier}</p>
+                                    <p><span className="font-semibold">Location:</span> {provider.city ?? "Pennsylvania"}</p>
+                                    <p><span className="font-semibold">Cost:</span> {provider.price_per_visit ?? (provider.sliding_scale ? "Sliding scale" : "Contact for pricing")}</p>
                                   </div>
                                   <button
                                     onClick={() => setSelectedProvider({
                                       id: provider.id,
                                       name: provider.name,
-                                      organization: provider.organization || "",
-                                      serviceType: provider.service_types?.join(", ") || "",
-                                      location: provider.city,
-                                      cost: provider.cost_tier,
-                                      phone: provider.phone || "",
-                                      website: provider.website || "",
+                                      organization: provider.listing_type ?? "",
+                                      serviceType: provider.services ?? provider.profession_name.replace(/_/g, " "),
+                                      location: provider.city ?? "Pennsylvania",
+                                      cost: provider.price_per_visit ?? (provider.sliding_scale ? "Sliding scale" : "Contact for pricing"),
+                                      phone: provider.phone ?? "",
+                                      website: provider.website ?? "",
                                       verified: true,
                                       verifiedDate: "2026",
                                     })}
