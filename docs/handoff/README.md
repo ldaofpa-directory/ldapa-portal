@@ -30,4 +30,4 @@ All diagrams are rendered from Mermaid source files in `../diagrams/`:
 
 ## Post-deployment support
 
-Through July 31st, 2026 — contact **Hazem El-Sayed** at `hmelsaye@andrew.cmu.edu`.
+Through July 31st, 2026 — contact **Hazem El-Sayed** at `hmelsaye@andrew.cmu.edu` or +974 3350 1813 (phone / WhatsApp).

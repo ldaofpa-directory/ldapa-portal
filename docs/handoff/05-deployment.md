@@ -211,7 +211,7 @@ A second Vercel project, sibling to the public portal:
 
 ### 5.3 Verifying
 
-Visit https://ldapa-admin-panel.vercel.app, log in with `admin@ldapa.org` / `admin123`, confirm the dashboard loads with provider counts and chat-volume chart.
+Visit https://ldapa-admin-panel.vercel.app, log in with `directory@ldaofpa.org` and the handed-over password, confirm the dashboard loads with provider counts and chat-volume chart.
 
 ---
 
@@ -248,7 +248,7 @@ After any significant deploy, confirm:
 - [ ] `GET /api/health` returns `{"status":"ok"}`.
 - [ ] Railway **Deployments** tab shows the latest commit as "Deployed".
 - [ ] Public portal loads; sending a chat message returns an assistant response + provider cards.
-- [ ] Admin login at https://ldapa-admin-panel.vercel.app works with `admin@ldapa.org` / current password.
+- [ ] Admin login at https://ldapa-admin-panel.vercel.app works with `directory@ldaofpa.org` / current password.
 - [ ] `/overview` on the admin panel shows a provider count > 0.
 - [ ] No red errors in Railway logs for the last 5 minutes.
 
@@ -265,7 +265,7 @@ After any significant deploy, confirm:
    ```sql
    UPDATE admin_users
    SET password_hash = '$2b$12$...new-bcrypt-hash-here...'
-   WHERE email = 'admin@ldapa.org';
+   WHERE email = 'directory@ldaofpa.org';
    ```
 
    Generate the bcrypt hash locally with Python:
@@ -274,6 +274,8 @@ After any significant deploy, confirm:
    import bcrypt
    bcrypt.hashpw(b"new-password", bcrypt.gensalt()).decode()
    ```
+
+   **Important:** `init_db()` re-asserts the canonical hash on every boot (see `backend/app/database.py`). So if you rotate in Postgres only, the next redeploy will reset it. Either update `admin_hash` in `database.py` to match, or accept that the rotation lasts only until the next deploy.
 
 ### 8.2 Rotating the OpenAI API key
 

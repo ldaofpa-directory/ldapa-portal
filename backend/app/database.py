@@ -234,30 +234,38 @@ async def init_db():
                     await db.executescript(seed_sql)
                     await db.commit()
 
-        # Ensure admin user exists
-        admin_count = await db.fetchval("SELECT COUNT(*) FROM admin_users")
-        if admin_count == 0:
-            if _USE_PG:
-                await db.execute(
-                    "INSERT INTO admin_users (id, email, password_hash, name) VALUES ($1, $2, $3, $4)",
-                    (
-                        "admin1",
-                        "admin@ldapa.org",
-                        "$2b$12$UztW.0/LOix.pUQCWUsX6uEhrePdvnDf2WgXr9CZebWSvrr8x8JNS",
-                        "LDA of PA Admin",
-                    ),
-                )
-            else:
-                await db.execute(
-                    "INSERT INTO admin_users (id, email, password_hash, name) VALUES (?, ?, ?, ?)",
-                    (
-                        "admin1",
-                        "admin@ldapa.org",
-                        "$2b$12$UztW.0/LOix.pUQCWUsX6uEhrePdvnDf2WgXr9CZebWSvrr8x8JNS",
-                        "LDA of PA Admin",
-                    ),
-                )
-            await db.commit()
+        # Seed / rotate the canonical admin user. Idempotent: removes legacy
+        # rows from previous email schemes, then upserts the canonical admin
+        # by primary key so a redeploy carries new credentials through.
+        legacy_emails = ("admin@ldapa.org", "admin@ldaofpa.org")
+        admin_id = "admin1"
+        admin_email = "directory@ldaofpa.org"
+        admin_hash = "$2b$12$uf4EEBXQGRweGjCmvcvATewhzhY.MI3GTftMFg5RnwXMHA03iwxYi"
+        admin_name = "LDA of PA Admin"
+
+        for legacy in legacy_emails:
+            await db.execute(
+                "DELETE FROM admin_users WHERE email = ?", (legacy,)
+            )
+
+        if _USE_PG:
+            await db.execute(
+                """INSERT INTO admin_users (id, email, password_hash, name)
+                   VALUES ($1, $2, $3, $4)
+                   ON CONFLICT (id) DO UPDATE SET
+                     email = EXCLUDED.email,
+                     password_hash = EXCLUDED.password_hash,
+                     name = EXCLUDED.name""",
+                (admin_id, admin_email, admin_hash, admin_name),
+            )
+        else:
+            await db.execute(
+                """INSERT OR REPLACE INTO admin_users
+                   (id, email, password_hash, name)
+                   VALUES (?, ?, ?, ?)""",
+                (admin_id, admin_email, admin_hash, admin_name),
+            )
+        await db.commit()
     finally:
         await release_db(db)
 

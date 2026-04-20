@@ -82,7 +82,7 @@ These are not optional. Do them as soon as you take over the account.
 
 1. **Add a payment method to Railway.** The free trial credit will run out and everything will shut off when it does. See §5.
 2. **Add credits (and auto-recharge) to OpenAI.** The AI stops working the moment your balance hits zero. See §6.
-3. **Change the default admin password.** It is currently `admin123` — everyone knows this because it's in the documentation. See §7.
+3. **Save the admin password in your password manager.** The admin panel login is `directory@ldaofpa.org` with a strong random password that Hazem has given you separately. Store it somewhere durable before you close the chat. See §7.
 4. **Rotate the OpenAI API key.** The key currently installed on Railway was created by the previous developer. Make your own and replace it. See §6.4.
 5. **(Recommended) Turn on two-factor authentication on the `directory@ldaofpa.org` Google account.** Since that single account unlocks everything, protect it with 2FA. Do this at https://myaccount.google.com/security.
 
@@ -196,14 +196,14 @@ The admin panel is where you actually do the work of running the directory (revi
 ### 7.1 Log in
 
 1. Go to https://ldapa-admin-panel.vercel.app
-2. Email: `admin@ldapa.org`
-3. Password: `admin123` *(change this today)*
+2. Email: `directory@ldaofpa.org`
+3. Password: the one Hazem gave you in your password manager / 1Password handover. **Do not paste it into email.**
 
 This login is **different from your Google login**. The admin panel does not use Google — it has its own email/password account that lives inside the portal's database.
 
-### 7.2 Change the default password
+### 7.2 Rotating the password later
 
-The password `admin123` is in every document about this project. It is not secret. Change it on your first login.
+The password handed to you is strong and random, so there's no urgency to change it on day one. But if you ever suspect it has leaked, or you want to set one you can remember, rotate it this way:
 
 > **The admin panel does not yet have a "change password" screen built in.** To change the password, ask a developer to:
 >
@@ -212,13 +212,15 @@ The password `admin123` is in every document about this project. It is not secre
 >    ```sql
 >    UPDATE admin_users
 >    SET password_hash = '<the hash from step 1>'
->    WHERE email = 'admin@ldapa.org';
+>    WHERE email = 'directory@ldaofpa.org';
 >    ```
 > 3. Tell you the new password verbally or through a password manager — don't email it.
 >
 > Doc 5, §8.1 has the same steps.
+>
+> **Heads-up:** the backend also ensures this admin row exists on every boot. If you rotate the password in Postgres, also update `admin_hash` in `backend/app/database.py` (the constant inside `init_db`) so a future redeploy doesn't reset your hash. Otherwise the rotation only lasts until the next Railway deploy.
 
-Until the password is rotated, **do not share the admin panel URL publicly** — anyone who visits with `admin123` gets full control of the directory.
+Keep the admin panel URL reasonably private — it is the keys to the directory.
 
 ### 7.3 What you can do once logged in
 
@@ -320,6 +322,8 @@ We provide **maintenance and support to resolve any implementation issues and pr
 **Tech Lead:** Hazem El-Sayed
 
 **Email:** `hmelsaye@andrew.cmu.edu`
+
+**Phone / WhatsApp:** +974 3350 1813
 
 ### When to reach out
 

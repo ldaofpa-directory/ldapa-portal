@@ -238,7 +238,7 @@ On startup (`lifespan` hook in `main.py`):
 
 1. `init_db()` runs `database/schema.sql` (with `CREATE TABLE IF NOT EXISTS`), which is a no-op if the tables already exist.
 2. If the `providers` table is empty, the backend looks for an `export_members*.csv` file in the repo and imports it.
-3. If no admin user exists, a default is created (`admin@ldapa.org` / `admin123`).
+3. The canonical admin user is upserted by primary key, so a redeploy also rotates the admin credentials if they change in code. Email: `directory@ldaofpa.org`; password is the bcrypt hash baked into `database.py`.
 
 This means the first-ever deploy seeds itself; subsequent deploys just start serving.
 

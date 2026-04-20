@@ -51,7 +51,7 @@ export default function SettingsPage() {
               </div>
               <div className="pt-2">
                 <Label htmlFor="notification-email" className="text-sm font-medium text-gray-700 mb-1 block">Notification Email</Label>
-                <Input id="notification-email" type="email" defaultValue="admin@ldaofpa.org" className="max-w-md" />
+                <Input id="notification-email" type="email" defaultValue="directory@ldaofpa.org" className="max-w-md" />
               </div>
             </div>
           </div>

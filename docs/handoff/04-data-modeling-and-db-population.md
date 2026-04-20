@@ -130,13 +130,13 @@ CREATE INDEX idx_providers_profession ON providers (profession_name);
 | `name` | TEXT NOT NULL | |
 | `created_at` | TEXT NOT NULL | |
 
-Default seed:
+Canonical admin (upserted by id on every `init_db`):
 - `id = 'admin1'`
-- `email = 'admin@ldapa.org'`
-- `password = 'admin123'` (hashed)
+- `email = 'directory@ldaofpa.org'`
+- `password_hash` = bcrypt of the strong random password (the hash is baked into `backend/app/database.py`; the plaintext is handed to the owner out-of-band).
 - `name = 'LDA of PA Admin'`
 
-**This password must be changed after takeover.** See **Doc 6 — Handoff**.
+Legacy rows (`admin@ldapa.org`, `admin@ldaofpa.org`) are deleted on boot so the canonical row wins. **See Doc 6 — Handoff § 7** for how to rotate the password.
 
 ---
 

@@ -89,7 +89,7 @@ export default function AdminLayout({
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold truncate">Staff Admin</p>
-              <p className="text-xs text-slate-400">admin@ldaofpa.org</p>
+              <p className="text-xs text-slate-400">directory@ldaofpa.org</p>
             </div>
           </div>
         </div>

@@ -145,8 +145,8 @@ Note: the API accepts `"positive"`/`"negative"`; they are stored in the database
 
 ```json
 {
-  "email": "admin@ldapa.org",
-  "password": "admin123"
+  "email": "directory@ldaofpa.org",
+  "password": "<see handoff doc 6 §7.1>"
 }
 ```
 
@@ -155,7 +155,7 @@ Note: the API accepts `"positive"`/`"negative"`; they are stored in the database
 ```json
 {
   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.....",
-  "user": { "id": "admin1", "email": "admin@ldapa.org", "name": "LDA of PA Admin" }
+  "user": { "id": "admin1", "email": "directory@ldaofpa.org", "name": "LDA of PA Admin" }
 }
 ```
 
